@@ -1,0 +1,6 @@
+".\Bin\STARTUP.obj",
+".\Bin\receive.obj",
+".\Bin\nRF24L01.obj",
+".\Bin\QC12864B.obj" 
+TO ".\Bin\nRF24L01Demo" 
+PRINT(".\nRF24L01Demo.m51")

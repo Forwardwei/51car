@@ -1,0 +1,77 @@
+C51 COMPILER V9.55   RECEIVE                                                               06/08/2016 13:26:38 PAGE 1   
+
+
+C51 COMPILER V9.55, COMPILATION OF MODULE RECEIVE
+OBJECT MODULE PLACED IN .\Bin\receive.obj
+COMPILER INVOKED BY: E:\Keil_c5\C51\BIN\C51.EXE receive.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND TABS(2) OBJECT(.\B
+                    -in\receive.obj)
+
+line level    source
+
+   1          #include "nRF24L01.h"
+   2          #include "def.h"
+   3          #include <stdio.h>
+   4          #include "QC12864B.h"
+   5          void Delay(unsigned int s)
+   6          {
+   7   1        unsigned int i;
+   8   1        for(i=0; i<s; i++);
+   9   1        for(i=0; i<s; i++);
+  10   1      }
+  11          
+  12          void main(void)
+  13          {
+  14   1        float RxBuf[16];
+  15   1        initprintf();
+  16   1        init_io() ;
+  17   1        LCDinit();
+  18   1         while(1)
+  19   1         {
+  20   2            if(nRF24L01_RxPacket(RxBuf))
+*** WARNING C182 IN LINE 20 OF receive.c: pointer to different objects
+  21   2            {
+  22   3              ES=0;
+  23   3              TI=1;
+  24   3              if(H==64)
+  25   3              {
+  26   4                printf("通道0000:%x ",H);
+  27   4                printf("第1:%f   ",RxBuf[0]);
+  28   4                printf("第2:%f    ",RxBuf[1]);
+  29   4                printf("第3:%f    \n",RxBuf[2]);
+  30   4                receiveA(RxBuf[0],RxBuf[1],RxBuf[2]);
+  31   4              }
+  32   3              if(H==66)
+  33   3              {
+  34   4                printf("通道1:%d ",H);
+  35   4                printf("第1:%f   ",RxBuf[0]);
+  36   4                printf("第2:%f    ",RxBuf[1]);
+  37   4                printf("第3:%f    \n",RxBuf[2]);
+  38   4                receiveB(RxBuf[0],RxBuf[1],RxBuf[2]);
+  39   4              }
+  40   3            TI=0;
+  41   3            ES=1;
+  42   3            }
+  43   2        }
+  44   1      }
+  45              
+  46            
+  47            
+  48          
+  49          
+  50          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+C51 COMPILER V9.55   RECEIVE                                                               06/08/2016 13:26:38 PAGE 2   
+
+   CODE SIZE        =    315    ----
+   CONSTANT SIZE    =     56    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      64
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

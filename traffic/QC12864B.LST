@@ -1,0 +1,258 @@
+C51 COMPILER V9.55   QC12864B                                                              06/08/2016 13:26:39 PAGE 1   
+
+
+C51 COMPILER V9.55, COMPILATION OF MODULE QC12864B
+OBJECT MODULE PLACED IN .\Bin\QC12864B.obj
+COMPILER INVOKED BY: E:\Keil_c5\C51\BIN\C51.EXE QC12864B.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND TABS(2) OBJECT(.\
+                    -Bin\QC12864B.obj)
+
+line level    source
+
+   1          //12864串行时序的实现
+   2          ///**************************************/
+   3          #include<reg51.h>
+   4          #include<intrins.h>
+   5          #include "QC12864B.h"
+   6          /**************************************/
+   7          #define  uchar    unsigned char
+   8          #define  uint     unsigned int 
+   9          
+  10          
+  11          //端口定义
+  12          sbit  LCD_CS=P2^6;
+  13          sbit  LCD_SID=P2^5;          //串行数据线
+  14          sbit  LCD_SCLK=P2^7;         //串上时钟输入
+  15          sbit  LCD_RST=P3^4; 
+  16          sbit  LCD_PSB=P3^2;
+  17          uchar code table1[]={"**双车模拟**"};      //定义要显示的字符串 
+  18          uchar code table2[]={"速度--路程--时间"}; 
+  19          /**************************************/
+  20          //延时函数
+  21          /**************************************/
+  22          void Delay_ms(uchar n)
+  23          {
+  24   1         uchar i;
+  25   1         uchar j;
+  26   1         for(i=0;i<n;i++)
+  27   1         for(j=0;j<125;j++)        //大概1ms
+  28   1       _nop_();
+  29   1      }
+  30          /**************************************/
+  31          //串行发送一个字节
+  32          /**************************************/
+  33          void LCD_sendbyte(uchar byte)
+  34          {
+  35   1         uchar i;
+  36   1         for(i=0;i<8;i++)
+  37   1          {
+  38   2         LCD_SCLK=0;               //拉低时钟线
+  39   2         _nop_();
+  40   2         LCD_SID=(bit)(byte&0x80);    //发送最高位数据
+  41   2         LCD_SCLK=1;               //上升沿发送数据
+  42   2         byte=byte<<1;                  //左移一位
+  43   2       }
+  44   1      }
+  45          
+  46          /****************************************/
+  47          //写指令
+  48          /****************************************/
+  49          void LCD_write_com(uchar com)
+  50          {
+  51   1        LCD_CS=1;        
+  52   1         LCD_sendbyte(0xf8);       //送入5个连续的“1“，启动一个周期,11111,RW(0),RS(0),0
+  53   1         LCD_sendbyte(0xf0&com);       //取高四位，数据分两次传送，
+  54   1                                       //每个字节的内容被送入两个字节
+C51 COMPILER V9.55   QC12864B                                                              06/08/2016 13:26:39 PAGE 2   
+
+  55   1                     //高四位放在第一个字节的高四位
+  56   1         LCD_sendbyte(0xf0&(com<<4));        //低四位放在第二个字节的高四位 
+  57   1          LCD_CS=0;       
+  58   1        Delay_ms(10);             //串行不支持读操作，不可检测忙操作，这里用延时替代   
+  59   1      }
+  60          /******************************************/
+  61          //写数据
+  62          /******************************************/
+  63          void LCD_write_dat(uchar dat)
+  64          {
+  65   1          LCD_CS=1;        
+  66   1         LCD_sendbyte(0xfa);        //送入5个连续的“1“，启动一个周期,11111,RW(0),RS(1),0
+  67   1         LCD_sendbyte(0xf0&dat);       //取高四位，数据分两次传送，
+  68   1                                       //每个字节的内容被送入两个字节
+  69   1                     //高四位放在第一个字节的高四位
+  70   1         LCD_sendbyte(0xf0&(dat<<4));        //低四位放在第二个字节
+  71   1          LCD_CS=0;        
+  72   1         Delay_ms(10);
+  73   1      }
+  74          /********************************************/
+  75          //LCD初始化
+  76          /********************************************/
+  77          void LCD_init(void)
+  78          {  
+  79   1       Delay_ms(5);
+  80   1       LCD_RST=1;
+  81   1       LCD_RST=0;
+  82   1       LCD_RST=1;
+  83   1       LCD_PSB=0; 
+  84   1       LCD_write_com(0x30);             //选择基本指令集   
+  85   1       LCD_write_com(0x0c);       //开显示，无游标，不反白
+  86   1       LCD_write_com(0x01);       //清除显示屏幕，把DDRAM位址计数器调整为00H
+  87   1       Delay_ms(5);         //清屏操作时间较长1.6ms 因此加此延时
+  88   1       LCD_write_com(0x02);       //清DDRAM位址归位,此处貌似与清屏重复
+  89   1       LCD_write_com(0x06);       //设定光标右移，整体显示不移动
+  90   1      }
+  91          
+  92          /***************************************************/
+  93          //设置显示地址
+  94          /***************************************************/
+  95          void LCD_Setaddress(uchar x,uchar y)
+  96          {              //地址从第1行第1列开始不从0开始
+  97   1        uchar addr;
+  98   1        switch(x)
+  99   1        {
+ 100   2         case 1: addr=0x80+y-1;
+ 101   2                 break;
+ 102   2         case 2: addr=0x90+y-1;
+ 103   2                 break;
+ 104   2         case 3: addr=0x88+y-1;
+ 105   2                 break;
+ 106   2         case 4: addr=0x98+y-1;
+ 107   2                 break;
+ 108   2         default : break;
+ 109   2        }
+ 110   1         LCD_write_com(addr);    //字符显示开始地址
+ 111   1      }
+ 112          /*****************************************************/
+ 113          //让字符串显示在固定位置
+ 114          /*****************************************************/
+ 115          void LCD_Putstring( uchar x, uchar y, uchar *pData )
+ 116          {
+C51 COMPILER V9.55   QC12864B                                                              06/08/2016 13:26:39 PAGE 3   
+
+ 117   1       LCD_Setaddress(x,y);
+ 118   1       while( *pData != '\0' )
+ 119   1       {
+ 120   2         LCD_write_dat( *pData++ );
+ 121   2       }
+ 122   1      }
+ 123          void LCD_Putuint( uchar x, uchar y, uint z  )
+ 124          {
+ 125   1        if(z<100)
+ 126   1        {
+ 127   2          uchar z1,z2;
+ 128   2          z1=z/10;
+ 129   2          z2=z%10;
+ 130   2          LCD_Setaddress(x,y);
+ 131   2          LCD_write_dat( 0x30);
+ 132   2          LCD_write_dat( 0x30+z1 );
+ 133   2          LCD_write_dat( 0x30+z2 );
+ 134   2        }
+ 135   1        else
+ 136   1        if(z>99&&z<999)
+ 137   1        {
+ 138   2          uchar z1,z2,z3;
+ 139   2          z1=z/100;
+ 140   2          z2=z%100/10;
+ 141   2          z3=z%100%10;
+ 142   2          LCD_Setaddress(x,y);
+ 143   2          LCD_write_dat( 0x30+z1 );
+ 144   2          LCD_write_dat( 0x30+z2 );
+ 145   2          LCD_write_dat( 0x30+z3);
+ 146   2        }
+ 147   1        else
+ 148   1          LCD_Putstring(x,y,"超时");
+ 149   1       
+ 150   1       
+ 151   1      }
+ 152          
+ 153          
+ 154          void LCD_Putfloatv( uchar x, uchar y, float z  )
+ 155          {
+ 156   1        uchar z1,z2;
+ 157   1        z1=(uchar)z;
+ 158   1        z2=(z-z1)*10;
+ 159   1        if(z>=10)
+ 160   1        {
+ 161   2          LCD_Putstring(x,y,"超速");
+ 162   2        }
+ 163   1        
+ 164   1        else
+ 165   1          {
+ 166   2            LCD_Setaddress(x,y);
+ 167   2            LCD_write_dat( 0x30+z1 );
+ 168   2            LCD_write_dat( 0x2e );
+ 169   2            LCD_write_dat( 0x30+z2 );
+ 170   2          }
+ 171   1            
+ 172   1        
+ 173   1      }
+ 174          void LCD_Putfloats( uchar x, uchar y, float z  )
+ 175          {
+ 176   1        if(z>=20)
+ 177   1        {
+ 178   2          LCD_Putstring(x,y,"超程");
+C51 COMPILER V9.55   QC12864B                                                              06/08/2016 13:26:39 PAGE 4   
+
+ 179   2        }
+ 180   1        else 
+ 181   1        {
+ 182   2          
+ 183   2          uchar z0,z1,z2,z3;
+ 184   2          z0=z*10;
+ 185   2          z1=z0/100;
+ 186   2          z2=(z0%100)/10;
+ 187   2          z3=(z0%100)%10;
+ 188   2          LCD_Setaddress(x,y);
+ 189   2          LCD_write_dat(0x30+z1);
+ 190   2          LCD_write_dat(0x30+z2);
+ 191   2          LCD_write_dat(0x2e);
+ 192   2          LCD_write_dat(0x30+z3);
+ 193   2         }
+ 194   1            
+ 195   1        
+ 196   1      }
+ 197          
+ 198          
+ 199          
+ 200          void LCDinit(void)
+ 201          {
+ 202   1        
+ 203   1        
+ 204   1        LCD_init();
+ 205   1      
+ 206   1        LCD_Putstring(1,2,table1);
+ 207   1        LCD_Putstring(2,1,table2);  
+ 208   1        LCD_Putstring(3,1,"A:");
+ 209   1        LCD_Putstring(4,1,"B:");
+ 210   1        LCD_Putstring(3,8," s");
+ 211   1        LCD_Putstring(4,8," s");
+ 212   1      
+ 213   1      }
+ 214          void receiveA(float Av,float As,uint At)
+ 215          {
+ 216   1        
+ 217   1        LCD_Putfloatv(3,2,Av); 
+ 218   1        LCD_Putfloats(3,4,As);
+ 219   1        LCD_Putuint(3,7,At);
+ 220   1        
+ 221   1      }
+ 222          void receiveB(float Bv,float Bs,uint Bt)
+ 223          {
+ 224   1      
+ 225   1        LCD_Putfloatv(4,2,Bv);
+ 226   1        LCD_Putfloats(4,4,Bs);
+ 227   1        LCD_Putuint(4,7,Bt);  
+ 228   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    825    ----
+   CONSTANT SIZE    =     54    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      46
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

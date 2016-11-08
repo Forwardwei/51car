@@ -1,0 +1,258 @@
+C51 COMPILER V9.55   NRF24L01                                                              06/08/2016 13:26:38 PAGE 1   
+
+
+C51 COMPILER V9.55, COMPILATION OF MODULE NRF24L01
+OBJECT MODULE PLACED IN .\Bin\nRF24L01.obj
+COMPILER INVOKED BY: E:\Keil_c5\C51\BIN\C51.EXE nRF24L01.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND TABS(2) OBJECT(.\
+                    -Bin\nRF24L01.obj)
+
+line level    source
+
+   1          //
+   2          // nRF24L01.c
+   3          
+   4          #include "nRF24L01.h"
+   5          #include "def.h"
+   6          
+   7          uchar const TX_ADDRESS[TX_ADR_WIDTH]  = {0x34,0x43,0x10,0x10,0x01};
+   8          uchar const RX_ADDRESS[RX_ADR_WIDTH]  = {0x34,0x43,0x10,0x10,0x01}; 
+   9          uchar const RX_ADDRESS1[RX_ADR_WIDTH]  = {0xb0,0xb2,0xb3,0xb4,0x01}; 
+  10           int H;
+  11          
+  12          
+  13          uchar   bdata sta;
+  14          sbit  RX_DR =sta^6;
+  15          sbit  TX_DS =sta^5;
+  16          sbit  MAX_RT  =sta^4;
+  17          
+  18          void inerDelay_us(unsigned char n)
+  19          {
+  20   1        for(;n>0;n--)
+  21   1          _nop_();
+  22   1      }
+  23          
+  24          void init_io(void)
+  25          {
+  26   1          inerDelay_us(100);
+  27   1        CE=0;   // chip enable
+  28   1        CSN=1;   // Spi disable 
+  29   1        SCK=0;   // Spi clock line init high
+  30   1      }
+  31          void initprintf()
+  32          {
+  33   1        TMOD=0x20;
+  34   1        TH1=0xfd;
+  35   1        TL1=0xfd;
+  36   1        TR1=1;
+  37   1        ET0=1;
+  38   1        SM0=0;
+  39   1        SM1=1;
+  40   1        REN=1;
+  41   1        EA=1;
+  42   1        ES=1;
+  43   1      }
+  44          
+  45          /**************************************************
+  46          Function: SPI_RW();
+  47          
+  48            Description:
+  49            Writes one byte to nRF24L01, and return the byte read
+  50            from nRF24L01 during write, according to SPI protocol
+  51          /**************************************************/
+  52          uchar SPI_RW(uchar byte)
+  53          {
+  54   1        uchar bit_ctr;
+C51 COMPILER V9.55   NRF24L01                                                              06/08/2016 13:26:38 PAGE 2   
+
+  55   1          for(bit_ctr=0;bit_ctr<8;bit_ctr++) // output 8-bit
+  56   1          {
+  57   2          MOSI = (byte & 0x80);         // output 'byte', MSB to MOSI
+  58   2          byte = (byte << 1);           // shift next bit into MSB..
+  59   2          SCK = 1;                      // Set SCK high..
+  60   2          byte |= MISO;             // capture current MISO bit
+  61   2          SCK = 0;                  // ..then set SCK low again
+  62   2          }
+  63   1          return(byte);                 // return read byte
+  64   1      }
+  65          /**************************************************/
+  66          
+  67          /**************************************************
+  68          Function: SPI_RW_Reg();
+  69          
+  70            Description:
+  71            Writes value 'value' to register 'reg'
+  72          /**************************************************/
+  73          uchar SPI_RW_Reg(BYTE reg, BYTE value)
+  74          {
+  75   1        uchar status;
+  76   1        
+  77   1        CSN = 0;                   // CSN low, init SPI transaction
+  78   1        status = SPI_RW(reg);      // select register
+  79   1        SPI_RW(value);             // ..and write value to it..
+  80   1        CSN = 1;                   // CSN high again
+  81   1        
+  82   1        return(status);            // return nRF24L01 status byte
+  83   1      }
+  84          /**************************************************/
+  85          
+  86          /**************************************************
+  87          Function: SPI_Read();
+  88          
+  89            Description:
+  90            Read one byte from nRF24L01 register, 'reg'
+  91          /**************************************************/
+  92          BYTE SPI_Read(BYTE reg)
+  93          {
+  94   1        BYTE reg_val;
+  95   1        
+  96   1        CSN = 0;                // CSN low, initialize SPI communication...
+  97   1        SPI_RW(reg);            // Select register to read from..
+  98   1        reg_val = SPI_RW(0);    // ..then read registervalue
+  99   1        CSN = 1;                // CSN high, terminate SPI communication
+ 100   1        
+ 101   1        return(reg_val);        // return register value
+ 102   1      }
+ 103          /**************************************************/
+ 104          
+ 105          /**************************************************
+ 106          Function: SPI_Read_Buf();
+ 107          
+ 108            Description:
+ 109            
+ 110          /**************************************************/
+ 111          uchar SPI_Read_Buf(BYTE reg, BYTE *pBuf, BYTE bytes)
+ 112          {
+ 113   1        uchar status,byte_ctr;
+ 114   1        
+ 115   1        CSN = 0;                        // Set CSN low, init SPI tranaction
+ 116   1        status = SPI_RW(reg);           // Select register to write to and read status byte
+C51 COMPILER V9.55   NRF24L01                                                              06/08/2016 13:26:38 PAGE 3   
+
+ 117   1        
+ 118   1        for(byte_ctr=0;byte_ctr<bytes;byte_ctr++)
+ 119   1          pBuf[byte_ctr] = SPI_RW(0);    // 
+ 120   1        
+ 121   1        CSN = 1;                           
+ 122   1        
+ 123   1        return(status);                    // return nRF24L01 status byte
+ 124   1      }
+ 125          /**************************************************/
+ 126          
+ 127          /**************************************************
+ 128          Function: SPI_Write_Buf();
+ 129          
+ 130            Description:
+ 131            Writes contents of buffer '*pBuf' to nRF24L01
+ 132            Typically used to write TX payload, Rx/Tx address
+ 133          /**************************************************/
+ 134          uchar SPI_Write_Buf(BYTE reg, BYTE *pBuf, BYTE bytes)
+ 135          {
+ 136   1        uchar status,byte_ctr;
+ 137   1        
+ 138   1        CSN = 0;                   
+ 139   1        status = SPI_RW(reg);   
+ 140   1        for(byte_ctr=0; byte_ctr<bytes; byte_ctr++) //
+ 141   1          SPI_RW(*pBuf++);
+ 142   1        CSN = 1;                 // Set CSN high again
+ 143   1        return(status);          // 
+ 144   1      }
+ 145          /**************************************************/
+ 146          
+ 147          /**************************************************
+ 148          Function: RX_Mode();
+ 149          
+ 150            Description:
+ 151            
+ 152          /**************************************************/
+ 153          void SetRX_Mode(void)
+ 154          {
+ 155   1        CE=0;
+ 156   1        
+ 157   1        SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, RX_ADDRESS, RX_ADR_WIDTH); // Use the same address on the RX device
+             - as the TX device
+ 158   1        SPI_Write_Buf(WRITE_REG + RX_ADDR_P1, RX_ADDRESS1, RX_ADR_WIDTH); // Use the same address on the RX devic
+             -e as the TX device
+ 159   1        SPI_RW_Reg(WRITE_REG + RX_PW_P0, TX_PLOAD_WIDTH);  // ½ÓÊÕÍ¨µÀ0Ñ¡ÔñºÍ·¢ËÍÍ¨µÀÏàÍ¬ÓÐÐ§Êý¾Ý¿í¶È£¬32×Ö½Ú³¤¶
+             -È
+ 160   1        SPI_RW_Reg(WRITE_REG + RX_PW_P1, TX_PLOAD_WIDTH);//32×Ö½Ú³¤¶È
+ 161   1        SPI_RW_Reg(WRITE_REG + EN_AA, 0x3f);      // 
+ 162   1        SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x3f);  // 
+ 163   1        SPI_RW_Reg(WRITE_REG + RF_CH, 0);        // 
+ 164   1        SPI_RW_Reg(WRITE_REG + RX_PW_P0, RX_PLOAD_WIDTH); 
+ 165   1        SPI_RW_Reg(WRITE_REG + RF_SETUP, 0x07);   
+ 166   1        SPI_RW_Reg(WRITE_REG + CONFIG, 0x0f);     
+ 167   1        
+ 168   1        CE = 1; 
+ 169   1        inerDelay_us(130);
+ 170   1      
+ 171   1      }
+ 172          /**************************************************/
+ 173          unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
+ 174          {
+ 175   1          unsigned char revale=0;
+C51 COMPILER V9.55   NRF24L01                                                              06/08/2016 13:26:38 PAGE 4   
+
+ 176   1      
+ 177   1        SetRX_Mode();
+ 178   1      
+ 179   1        sta=SPI_Read(STATUS); // read register STATUS's value
+ 180   1        H=sta;
+ 181   1        
+ 182   1        if(RX_DR)       // if receive data ready (RX_DR) interrupt
+ 183   1        {
+ 184   2            CE = 0; 
+ 185   2          SPI_Read_Buf(RD_RX_PLOAD,rx_buf,TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
+ 186   2          revale =1;//we have receive data
+ 187   2        }
+ 188   1        SPI_RW_Reg(WRITE_REG+STATUS,sta);// clear RX_DR or TX_DS or MAX_RT interrupt flag
+ 189   1        
+ 190   1        return revale;
+ 191   1      }
+ 192          
+ 193          /**************************************************
+ 194          Function: nRF24L01_TxPacket();
+ 195          
+ 196            Description:
+ 197            This function initializes one nRF24L01 device to
+ 198            TX mode, set TX address, set RX address for auto.ack,
+ 199            fill TX payload, select RF channel, datarate & TX pwr.
+ 200            PWR_UP is set, CRC(2 bytes) is enabled, & PRIM:TX.
+ 201            
+ 202            ToDo: One high pulse(>10us) on CE will now send this
+ 203            packet and expext an acknowledgment from the RX device.
+ 204          /**************************************************/
+ 205          void nRF24L01_TxPacket(unsigned char * tx_buf)
+ 206          {
+ 207   1        CE=0;
+ 208   1        
+ 209   1        SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);    // 
+ 210   1        SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS, TX_ADR_WIDTH); 
+ 211   1        SPI_Write_Buf(WR_TX_PLOAD, tx_buf, TX_PLOAD_WIDTH); 
+ 212   1        
+ 213   1        SPI_RW_Reg(WRITE_REG + EN_AA, 0x3f);      // 
+ 214   1        SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x3f);  // 
+ 215   1        SPI_RW_Reg(WRITE_REG + SETUP_RETR, 0x1a); //
+ 216   1        SPI_RW_Reg(WRITE_REG + RF_CH, 0);        // 
+ 217   1        SPI_RW_Reg(WRITE_REG + RF_SETUP, 0x07);   // 
+ 218   1        SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);     // 
+ 219   1        CE=1;
+ 220   1        inerDelay_us(10);
+ 221   1        sta=SPI_Read(STATUS); // read register STATUS's value
+ 222   1        SPI_RW_Reg(WRITE_REG+STATUS,SPI_Read(READ_REG+STATUS)); // clear interrupt flag(TX_DS)
+ 223   1        
+ 224   1      }
+ 225          /**************************************************/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    446    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     18      17
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
